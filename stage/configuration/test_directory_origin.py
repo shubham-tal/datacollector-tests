@@ -204,9 +204,66 @@ def test_directory_origin_configuration_archive_directory(sdc_builder, sdc_execu
 
 
 @pytest.mark.parametrize('file_post_processing', ['ARCHIVE'])
-@pytest.mark.skip('Not yet implemented')
-def test_directory_origin_configuration_archive_retention_time_in_mins(sdc_builder, sdc_executor, file_post_processing):
-    pass
+@pytest.mark.parametrize('wait_time_in_secs', [90, 1])
+def test_directory_origin_configuration_archive_retention_time_in_mins(sdc_builder, sdc_executor, file_post_processing,
+                                                                        shell_executor, file_writer, wait_time_in_secs):
+    """Verify that the Archive retention in mins configuration is used when deleting archived files as part of post-processing.
+        Here we will run file with file_post_processing=ARCHIVE and archive_retention_time_in_mins=1 configs.
+        We check if file is present in archive. Then after waiting for 1.5 mins (90 secs) we check if the file in archived directory is deleted or not."""
+    files_directory = os.path.join('/tmp', get_random_string())
+    archive_directory = os.path.join('/tmp', get_random_string())
+    FILE_NAME = 'archive_retention_test.txt'
+    FILE_CONTENTS = "This is file contet to test archive retnetion."
+
+    try:
+        logger.debug('Creating files directory %s ...', files_directory)
+        shell_executor(f'mkdir {files_directory}')
+        file_writer(os.path.join(files_directory, FILE_NAME), FILE_CONTENTS)
+
+        logger.debug('Creating archive directory %s ...', archive_directory)
+        shell_executor(f'mkdir {archive_directory}')
+
+        pipeline_builder = sdc_builder.get_pipeline_builder()
+        directory = pipeline_builder.add_stage('Directory')
+        directory.set_attributes(archive_directory=archive_directory,
+                                 data_format='TEXT',
+                                 files_directory=files_directory,
+                                 file_name_pattern=FILE_NAME,
+                                 file_post_processing=file_post_processing,
+                                 archive_retention_time_in_mins=1)
+        trash = pipeline_builder.add_stage('Trash')
+        directory >> trash
+        pipeline = pipeline_builder.build()
+
+        sdc_executor.add_pipeline(pipeline)
+        sdc_executor.start_pipeline(pipeline).wait_for_pipeline_batch_count(1)
+        time.sleep(wait_time_in_secs)
+        sdc_executor.stop_pipeline(pipeline)
+
+        if wait_time_in_secs < 60:
+            logger.info('Verifying that file %s was moved as part of post-processing ...', FILE_NAME)
+            pipeline_builder = sdc_builder.get_pipeline_builder()
+            directory = pipeline_builder.add_stage('Directory')
+            directory.set_attributes(data_format='TEXT',
+                                     files_directory=archive_directory,
+                                     file_name_pattern=FILE_NAME)
+            trash = pipeline_builder.add_stage('Trash')
+            directory >> trash
+            pipeline = pipeline_builder.build()
+
+            sdc_executor.add_pipeline(pipeline)
+            snapshot = sdc_executor.capture_snapshot(pipeline, start_pipeline=True).snapshot
+            record = snapshot[directory].output[0]
+            sdc_executor.stop_pipeline(pipeline)
+            assert record.field['text'] == FILE_CONTENTS
+        else:
+            sdc_executor.reset_origin(pipeline)
+            snapshot = sdc_executor.capture_snapshot(pipeline, start_pipeline=True).snapshot
+            assert not snapshot[directory].output
+    finally:
+        shell_executor(f'rm -r {files_directory} {archive_directory}')
+        if sdc_executor.get_pipeline_status(pipeline).response.json().get('status') == 'RUNNING':
+            sdc_executor.stop_pipeline(pipeline)
 
 
 @pytest.mark.parametrize('data_format', ['DATAGRAM'])
