@@ -669,6 +669,14 @@ def test_directory_origin_configuration_process_subdirectories(sdc_builder, sdc_
 @pytest.mark.parametrize('data_format', ['PROTOBUF'])
 def test_directory_origin_configuration_protobuf_descriptor_file(sdc_builder, sdc_executor, data_format,
                                                                  shell_executor):
+    """
+    For this test, ./resources/protobuf/addressbook.desc needs to be placed in
+    $SDC_RESOURCES/resources/protobuf directory.
+
+    Use dev_raw_data_source >> local_fs to output a protobuf format file
+    Use directory >> trash to test the protobuf format for directory origin
+    """
+
     try:
         message = '{"first_name": "Vijendra","last_name": "Khemnar"}'
         # expected = '(\'first_name\', Vijendra), (\'last_name\', Khemnar)'
@@ -695,7 +703,9 @@ def test_directory_origin_configuration_protobuf_descriptor_file(sdc_builder, sd
         sdc_executor.stop_pipeline(pipeline)
         output_records = snapshot[directory.instance_name].output
         print(output_records)
-
+        # Write asserts based on 'expected', it should be present in the output records
+        # record_field = [record.field for record in output_records]
+        # assert expected in str(record_field[0])
     finally:
         shell_executor(f'rm -r {files_directory}')
 
