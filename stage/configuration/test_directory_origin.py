@@ -14,7 +14,6 @@
 #
 import logging
 import os
-import tempfile
 
 import pytest
 from streamsets.sdk.sdc_api import StartError
@@ -672,53 +671,14 @@ def test_directory_origin_configuration_protobuf_descriptor_file(sdc_builder, sd
                                                                  shell_executor):
     try:
         message = '{"first_name": "Vijendra","last_name": "Khemnar"}'
-        expected = '(\'first_name\', Vijendra), (\'last_name\', Khemnar)'
+        # expected = '(\'first_name\', Vijendra), (\'last_name\', Khemnar)'
         file_name = get_random_string()
-
-        # files_directory = tempfile.gettempdir()
-        # print("Protobuf directory " + files_directory + " " + str(os.path.exists(files_directory)))
-        # proto_file_name = setup_protobuf_file_by_fw(files_directory, file_name)
-        #
-        # print("Protobuf file " + proto_file_name + " " + str(os.path.exists(proto_file_name)))
-        # statinfo = os.stat(proto_file_name)
-        # print(statinfo.st_size)
-        # print("DESC FILE " + str(os.path.exists(PROTOBUF_FILE_PATH)))
-        #
-        # pipeline_builder = sdc_builder.get_pipeline_builder()
-        # directory = pipeline_builder.add_stage('Directory')
-        # directory.set_attributes(data_format=data_format,
-        #                          files_directory=files_directory,
-        #                          file_name_pattern=os.path.basename(proto_file_name) + "*",
-        #                          file_name_pattern_mode='GLOB',
-        #                          message_type='Contact',
-        #                          protobuf_descriptor_file=PROTOBUF_FILE_PATH,
-        #                          delimited_messages=False
-        #                          )
-        # trash = pipeline_builder.add_stage('Trash')
-        # directory >> trash
-        # directory_pipeline = pipeline_builder.build()
-        # sdc_executor.add_pipeline(directory_pipeline)
-        #
-        # snapshot = sdc_executor.capture_snapshot(directory_pipeline, start_pipeline=True).snapshot
-        # sdc_executor.stop_pipeline(directory_pipeline)
-        #
-        # output_records = snapshot[directory.instance_name].output
-        # print("Proto output is " + str(output_records))
-
-        # files_directory = f'tmp/out/{get_random_string()}'
 
         files_directory = os.path.join('/tmp', get_random_string())
         setup_protobuf_file_by_local_fs(sdc_executor, files_directory, file_name, message)
 
-        print("DESC FILE " + str(os.path.exists(PROTOBUF_FILE_PATH)))
-        print("Protobuf directory " + files_directory + " "
-              + str(os.path.exists(files_directory)))
-        print("Protobuf file " + str(os.path.join(files_directory, file_name)) + " "
-              + str(os.path.exists(os.path.join(files_directory, file_name))))
-
         pipeline_builder = sdc_builder.get_pipeline_builder()
         directory = pipeline_builder.add_stage('Directory')
-        file_name_pattern = file_name + '*'
         directory.set_attributes(data_format=data_format,
                                  files_directory=files_directory,
                                  file_name_pattern='*',
@@ -735,41 +695,12 @@ def test_directory_origin_configuration_protobuf_descriptor_file(sdc_builder, sd
         sdc_executor.stop_pipeline(pipeline)
         output_records = snapshot[directory.instance_name].output
         print(output_records)
-        print(directory.instance_name)
-        for data in snapshot:
-            print(data.stage_outputs)
+
     finally:
-        pass
-        # shell_executor(f'rm -r {files_directory}')
-
-
-def setup_protobuf_file_by_fw(files_directory, file_name):
-    # logger.debug('Creating files directory %s ...', files_directory)
-    # shell_executor(f'mkdir {files_directory}')
-    contact = addressbook_pb2.Contact()
-    contact.first_name = 'Vijendra'
-    contact.last_name = 'Khemnar'
-    proto_file = tempfile.NamedTemporaryFile(mode='wb', suffix=file_name, dir=files_directory, delete=False)
-    proto_file.write(contact.SerializeToString())
-    proto_file.close()
-    # with open(r'{}'.format(str(os.path.join(files_directory, file_name))), 'wb') as f:
-    #     f.write(contact.SerializeToString())
-
-    # file_writer(filepath=os.path.join(files_directory, file_name), file_contents=contact.SerializeToString())
-    # print("Protobuf file " + str(os.path.join(files_directory, file_name)) + " " +
-    #       str(os.path.exists(os.path.join(files_directory, file_name))))
-
-    # with open(proto_file_name, 'rb') as f:
-    #     read_metric = addressbook_pb2.Contact()
-    #     read_metric.ParseFromString(f.read())
-    #     print(read_metric.first_name)
-    #     print(read_metric.last_name)
-
-    return proto_file.name
+        shell_executor(f'rm -r {files_directory}')
 
 
 def setup_protobuf_file_by_local_fs(sdc_executor, files_directory, file_name, message):
-    print("Dir is " + files_directory)
     pipeline_builder = sdc_executor.get_pipeline_builder()
     dev_raw_data_source = pipeline_builder.add_stage('Dev Raw Data Source')
     dev_raw_data_source.set_attributes(data_format='JSON', raw_data=message, stop_after_first_batch=True)
