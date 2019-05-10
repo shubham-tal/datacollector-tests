@@ -711,6 +711,9 @@ def test_directory_origin_configuration_protobuf_descriptor_file(sdc_builder, sd
 
 
 def setup_protobuf_file_by_local_fs(sdc_executor, files_directory, file_name, message):
+    """
+    TODO : Move this into a Fixture
+    """
     pipeline_builder = sdc_executor.get_pipeline_builder()
     dev_raw_data_source = pipeline_builder.add_stage('Dev Raw Data Source')
     dev_raw_data_source.set_attributes(data_format='JSON', raw_data=message, stop_after_first_batch=True)
