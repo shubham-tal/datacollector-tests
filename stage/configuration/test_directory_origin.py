@@ -661,6 +661,40 @@ def test_directory_origin_configuration_log_format(sdc_builder, sdc_executor, da
     pass
 
 
+@pytest.mark.parametrize('data_format', ['LOG'])
+@pytest.mark.parametrize('log_format', ['APACHE_ERROR_LOG_FORMAT'])
+def test_directory_origin_configuration_error_log_format(sdc_builder, sdc_executor, file_writer,
+                                                         shell_executor, data_format, log_format):
+    try:
+        FILES_DIRECTORY = os.path.join('/tmp', get_random_string())
+        FILE_CONTENTS = '[Wed Oct 11 14:32:52 2000] [error] [client 127.0.0.1] client denied by server ' \
+                        'configuration: /export/home/live/ap/htdocs/test'
+        file_name = f'error_log_{get_random_string()}'
+
+        file_writer(os.path.join(FILES_DIRECTORY, file_name), FILE_CONTENTS)
+
+        pipeline_builder = sdc_builder.get_pipeline_builder()
+        directory = pipeline_builder.add_stage('Directory')
+        directory.set_attributes(data_format=data_format,
+                                 files_directory=FILES_DIRECTORY,
+                                 file_name_pattern='error_log_*',
+                                 file_name_pattern_mode='GLOB',
+                                 log_format=log_format)
+        trash = pipeline_builder.add_stage('Trash')
+        directory >> trash
+        pipeline = pipeline_builder.build()
+
+        sdc_executor.add_pipeline(pipeline)
+        snapshot = sdc_executor.capture_snapshot(pipeline, start_pipeline=True).snapshot
+        print(snapshot[directory].output)
+        record = snapshot[directory].output[0]
+        sdc_executor.stop_pipeline(pipeline)
+        print(record)
+    finally:
+        shell_executor(f'rm -r {FILES_DIRECTORY}')
+
+
+
 @pytest.mark.parametrize('data_format', ['AVRO'])
 @pytest.mark.parametrize('lookup_schema_by', ['AUTO', 'ID', 'SUBJECT'])
 @pytest.mark.skip('Not yet implemented')
