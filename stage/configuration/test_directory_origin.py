@@ -700,6 +700,203 @@ def test_directory_origin_configuration_error_log_format(sdc_builder, sdc_execut
         shell_executor(f'rm -r {FILES_DIRECTORY}')
 
 
+@pytest.mark.parametrize('data_format', ['LOG'])
+@pytest.mark.parametrize('log_format', ['COMMON_LOG_FORMAT'])
+def test_directory_origin_configuration_common_log_format(sdc_builder, sdc_executor, file_writer,
+                                                          shell_executor, data_format, log_format):
+    try:
+        FILES_DIRECTORY = os.path.join('/tmp', get_random_string())
+        request = '/apache_pb.gif'
+        auth = 'frank'
+        ident = '-'
+        response = '200'
+        bytes = '2326'
+        client_ip = '127.0.0.1'
+        verb = 'GET'
+        http_version = '1.0'
+        timestamp = '10/Oct/2000:13:55:36 -0700'
+        FILE_CONTENTS = '{} {} {} [{}] "{} {} HTTP/{}" {} {}'.format(
+            client_ip, ident, auth, timestamp, verb, request, http_version, response, bytes)
+        file_name = f'common_log_{get_random_string()}.log'
+
+        logger.debug('Creating archive directory %s ...', FILES_DIRECTORY)
+        shell_executor(f'mkdir {FILES_DIRECTORY}')
+
+        file_writer(os.path.join(FILES_DIRECTORY, file_name), FILE_CONTENTS)
+
+        pipeline_builder = sdc_builder.get_pipeline_builder()
+        directory = pipeline_builder.add_stage('Directory')
+        directory.set_attributes(data_format=data_format,
+                                 files_directory=FILES_DIRECTORY,
+                                 file_name_pattern='common_log_*',
+                                 file_name_pattern_mode='GLOB',
+                                 log_format=log_format)
+        trash = pipeline_builder.add_stage('Trash')
+        directory >> trash
+        pipeline = pipeline_builder.build()
+
+        sdc_executor.add_pipeline(pipeline)
+        snapshot = sdc_executor.capture_snapshot(pipeline, start_pipeline=True).snapshot
+        sdc_executor.stop_pipeline(pipeline)
+        assert len(snapshot[directory].output) == 1
+        assert snapshot[directory].output[0].field == OrderedDict(
+               zip(['request', 'auth', 'ident', 'response', 'bytes', 'clientip', 'verb',
+                    'httpversion', 'rawrequest', 'timestamp'],
+                   [request, auth, ident, response, bytes, client_ip, verb, http_version, None, timestamp]))
+    finally:
+        shell_executor(f'rm -r {FILES_DIRECTORY}')
+
+
+@pytest.mark.parametrize('data_format', ['LOG'])
+@pytest.mark.parametrize('log_format', ['COMBINED_LOG_FORMAT'])
+def test_directory_origin_configuration_combined_log_format(sdc_builder, sdc_executor, file_writer,
+                                                            shell_executor, data_format, log_format):
+    try:
+        FILES_DIRECTORY = os.path.join('/tmp', get_random_string())
+        request = '/apache_pb.gif'
+        agent = '"Mozilla/4.08 [en] (Win98; I ;Nav)"'
+        auth = 'frank'
+        ident = '-'
+        referrer = '"http://www.example.com/start.html"'
+        response = '200'
+        bytes = '2326'
+        client_ip = '127.0.0.1'
+        verb = 'GET'
+        http_version = '1.0'
+        timestamp = '10/Oct/2000:13:55:36 -0700'
+        FILE_CONTENTS = '{} {} {} [{}] "{} {} HTTP/{}" {} {} {} {}'.format(
+            client_ip, ident, auth, timestamp, verb, request, http_version, response, bytes, referrer, agent)
+        file_name = f'combined_log_{get_random_string()}.log'
+
+        logger.debug('Creating archive directory %s ...', FILES_DIRECTORY)
+        shell_executor(f'mkdir {FILES_DIRECTORY}')
+
+        file_writer(os.path.join(FILES_DIRECTORY, file_name), FILE_CONTENTS)
+
+        pipeline_builder = sdc_builder.get_pipeline_builder()
+        directory = pipeline_builder.add_stage('Directory')
+        directory.set_attributes(data_format=data_format,
+                                 files_directory=FILES_DIRECTORY,
+                                 file_name_pattern='combined_log_*',
+                                 file_name_pattern_mode='GLOB',
+                                 log_format=log_format)
+        trash = pipeline_builder.add_stage('Trash')
+        directory >> trash
+        pipeline = pipeline_builder.build()
+
+        sdc_executor.add_pipeline(pipeline)
+        snapshot = sdc_executor.capture_snapshot(pipeline, start_pipeline=True).snapshot
+        sdc_executor.stop_pipeline(pipeline)
+        assert len(snapshot[directory].output) == 1
+        assert snapshot[directory].output[0].field == OrderedDict(
+               zip(['request', 'agent', 'auth', 'ident', 'verb', 'referrer', 'response',
+                    'bytes', 'clientip', 'httpversion', 'rawrequest', 'timestamp'],
+                   [request, agent, auth, ident, verb, referrer, response, bytes,
+                    client_ip, http_version, None, timestamp]))
+    finally:
+        shell_executor(f'rm -r {FILES_DIRECTORY}')
+
+
+@pytest.mark.parametrize('data_format', ['LOG'])
+@pytest.mark.parametrize('log_format', ['CEF'])
+def test_directory_origin_configuration_common_event_format(sdc_builder, sdc_executor, file_writer,
+                                                            shell_executor, data_format, log_format):
+    try:
+        FILES_DIRECTORY = os.path.join('/tmp', get_random_string())
+        severity = '10'
+        product = 'threatmanager'
+        signature = '100'
+        vendor = 'security'
+        cef_version = 0
+        name = 'worm successfully stopped'
+        version = '1.0'
+        ext_dst = '2.1.2.2'
+        ext_src = '10.0.0.1'
+        ext_spt = '1232'
+
+        FILE_CONTENTS = 'CEF:{}|{}|{}|{}|{}|{}|{}|src={} dst={} spt={}'.format(cef_version, vendor, product, version,
+                                                                               signature, name, severity, ext_src,
+                                                                               ext_dst, ext_spt)
+        file_name = f'common_log_{get_random_string()}.log'
+
+        logger.debug('Creating archive directory %s ...', FILES_DIRECTORY)
+        shell_executor(f'mkdir {FILES_DIRECTORY}')
+
+        file_writer(os.path.join(FILES_DIRECTORY, file_name), FILE_CONTENTS)
+
+        pipeline_builder = sdc_builder.get_pipeline_builder()
+        directory = pipeline_builder.add_stage('Directory')
+        directory.set_attributes(data_format=data_format,
+                                 files_directory=FILES_DIRECTORY,
+                                 file_name_pattern='common_log_*',
+                                 file_name_pattern_mode='GLOB',
+                                 log_format=log_format)
+        trash = pipeline_builder.add_stage('Trash')
+        directory >> trash
+        pipeline = pipeline_builder.build()
+
+        sdc_executor.add_pipeline(pipeline)
+        snapshot = sdc_executor.capture_snapshot(pipeline, start_pipeline=True).snapshot
+        sdc_executor.stop_pipeline(pipeline)
+        assert len(snapshot[directory].output) == 1
+        assert snapshot[directory].output[0].field == OrderedDict(
+               zip(['severity', 'product', 'extensions', 'signature', 'vendor', 'cefVersion', 'name', 'version'],
+                   [severity, product, {'dst': ext_dst, 'src': ext_src, 'spt': ext_spt}, signature,
+                    vendor, cef_version, name, version]))
+    finally:
+        shell_executor(f'rm -r {FILES_DIRECTORY}')
+
+
+@pytest.mark.parametrize('data_format', ['LOG'])
+@pytest.mark.parametrize('log_format', ['LEEF'])
+def test_directory_origin_configuration_log_event_extended_format(sdc_builder, sdc_executor, file_writer,
+                                                            shell_executor, data_format, log_format):
+    try:
+        FILES_DIRECTORY = os.path.join('/tmp', get_random_string())
+        event_id = 'NEW_PORT_DISCOVERD'
+        product = 'QRM'
+        msg = 'there are spaces in this message '
+        leef_version = 1.0
+        vendor = 'QRadar'
+        version = '1.0'
+        src = '172.5.6.67'
+        dst = '172.50.123.1'
+        sev = '5'
+        cat = 'anomaly'
+
+        FILE_CONTENTS = 'LEEF:{}|{}|{}|{}|{}|src={} dst={}  sev={}  cat={}  msg={}'.format(
+                                                                                      leef_version, vendor, product,
+                                                                                      version, event_id, src, dst,
+                                                                                      sev, cat, msg)
+        file_name = f'leef_log_{get_random_string()}.log'
+
+        logger.debug('Creating archive directory %s ...', FILES_DIRECTORY)
+        shell_executor(f'mkdir {FILES_DIRECTORY}')
+
+        file_writer(os.path.join(FILES_DIRECTORY, file_name), FILE_CONTENTS)
+
+        pipeline_builder = sdc_builder.get_pipeline_builder()
+        directory = pipeline_builder.add_stage('Directory')
+        directory.set_attributes(data_format=data_format,
+                                 files_directory=FILES_DIRECTORY,
+                                 file_name_pattern='leef_log_*',
+                                 file_name_pattern_mode='GLOB',
+                                 log_format=log_format)
+        trash = pipeline_builder.add_stage('Trash')
+        directory >> trash
+        pipeline = pipeline_builder.build()
+
+        sdc_executor.add_pipeline(pipeline)
+        snapshot = sdc_executor.capture_snapshot(pipeline, start_pipeline=True).snapshot
+        sdc_executor.stop_pipeline(pipeline)
+        assert len(snapshot[directory].output) == 1
+        assert snapshot[directory].output[0].field == OrderedDict(
+               zip(['eventId', 'product', 'extensions', 'leefVersion', 'vendor', 'version'],
+                   [event_id, product, {'src': msg}, leef_version, vendor, version]))
+    finally:
+        shell_executor(f'rm -r {FILES_DIRECTORY}')
+
+
 @pytest.mark.parametrize('data_format', ['AVRO'])
 @pytest.mark.parametrize('lookup_schema_by', ['AUTO', 'ID', 'SUBJECT'])
 @pytest.mark.skip('Not yet implemented')
