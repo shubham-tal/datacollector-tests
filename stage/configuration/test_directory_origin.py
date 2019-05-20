@@ -667,9 +667,15 @@ def test_directory_origin_configuration_error_log_format(sdc_builder, sdc_execut
                                                          shell_executor, data_format, log_format):
     try:
         FILES_DIRECTORY = os.path.join('/tmp', get_random_string())
-        FILE_CONTENTS = '[Wed Oct 11 14:32:52 2000] [error] [client 127.0.0.1] client denied by server ' \
-                        'configuration: /export/home/live/ap/htdocs/test'
-        file_name = f'error_log_{get_random_string()}'
+        message = 'client denied by server configuration: /export/home/live/ap/htdocs/test'
+        timestamp = 'Wed Oct 11 14:32:52 2000'
+        loglevel = 'error'
+        client_ip = '127.0.0.1'
+        FILE_CONTENTS = '[{}] [{}] [client {}] {}'.format(timestamp, loglevel, client_ip, message)
+        file_name = f'error_log_{get_random_string()}.log'
+
+        logger.debug('Creating archive directory %s ...', FILES_DIRECTORY)
+        shell_executor(f'mkdir {FILES_DIRECTORY}')
 
         file_writer(os.path.join(FILES_DIRECTORY, file_name), FILE_CONTENTS)
 
@@ -686,13 +692,12 @@ def test_directory_origin_configuration_error_log_format(sdc_builder, sdc_execut
 
         sdc_executor.add_pipeline(pipeline)
         snapshot = sdc_executor.capture_snapshot(pipeline, start_pipeline=True).snapshot
-        print(snapshot[directory].output)
-        record = snapshot[directory].output[0]
         sdc_executor.stop_pipeline(pipeline)
-        print(record)
+        assert len(snapshot[directory].output) == 1
+        assert snapshot[directory].output[0].field == OrderedDict(
+               zip(['message', 'timestamp', 'loglevel', 'clientip'], [message, timestamp, loglevel, client_ip]))
     finally:
         shell_executor(f'rm -r {FILES_DIRECTORY}')
-
 
 
 @pytest.mark.parametrize('data_format', ['AVRO'])
